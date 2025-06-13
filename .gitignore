@@ -1,0 +1,20 @@
+# Backup files
+*.sql.gz
+*.sql
+*.log
+
+# Logs and backups directories
+logs/
+backups/
+
+# MySQL config
+my.cnf
+*.my.cnf
+
+# Editor and temporary files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+*~

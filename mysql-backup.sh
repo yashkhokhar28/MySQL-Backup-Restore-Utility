@@ -21,13 +21,13 @@ COLOR_CYAN='\033[36m'
 log_message() {
     local MSG="$1"
     local TYPE="$2"
-    echo "$MSG" >> "$LOG_FILE"
+    echo "$MSG" >>"$LOG_FILE"
 
     case "$TYPE" in
-        "error") echo -e "${COLOR_RED}$MSG${COLOR_RESET}" ;;
-        "success") echo -e "${COLOR_GREEN}$MSG${COLOR_RESET}" ;;
-        "info") echo -e "${COLOR_BLUE}$MSG${COLOR_RESET}" ;;
-        *) echo -e "${COLOR_CYAN}$MSG${COLOR_RESET}" ;;
+    "error") echo -e "${COLOR_RED}$MSG${COLOR_RESET}" ;;
+    "success") echo -e "${COLOR_GREEN}$MSG${COLOR_RESET}" ;;
+    "info") echo -e "${COLOR_BLUE}$MSG${COLOR_RESET}" ;;
+    *) echo -e "${COLOR_CYAN}$MSG${COLOR_RESET}" ;;
     esac
 }
 
@@ -36,7 +36,7 @@ mkdir -p "$BACKUP_DIR" && mkdir -p "$(dirname "$LOG_FILE")"
 log_message "Directories for backup and log exist." "info"
 
 # Check for MySQL binary and version
-if ! command -v mysql &> /dev/null; then
+if ! command -v mysql &>/dev/null; then
     log_message "MySQL binary not found. Aborting." "error"
     exit 1
 fi
@@ -51,14 +51,14 @@ fi
 log_message "MySQL config file (~/.my.cnf) is valid." "info"
 
 # Check mysqlpump exists and is executable
-if ! command -v mysqlpump &> /dev/null; then
+if ! command -v mysqlpump &>/dev/null; then
     log_message "mysqlpump not found or not executable." "error"
     exit 1
 fi
 log_message "mysqlpump exists and is executable." "info"
 
 # Check mysqlbinlog and binlog config
-if ! command -v mysqlbinlog &> /dev/null; then
+if ! command -v mysqlbinlog &>/dev/null; then
     log_message "mysqlbinlog not found." "error"
     exit 1
 fi
@@ -72,7 +72,7 @@ BINLOG_DIR=$(dirname "$BINLOG_BASE")
 log_message "mysqlbinlog exists, binary logging enabled, binlog directory: $BINLOG_DIR" "info"
 
 # Check gzip
-if ! command -v gzip &> /dev/null; then
+if ! command -v gzip &>/dev/null; then
     log_message "gzip not found." "error"
     exit 1
 fi
@@ -104,8 +104,8 @@ for DB_NAME in $ALL_DBS; do
             exit 1
         fi
 
-        read BINLOG_FILE START_POS < "$LAST_FULL_POS_FILE"
-        read CUR_BINLOG CUR_POS <<< $(mysql -e "SHOW MASTER STATUS\G" | awk '/File:/ {file=$2} /Position:/ {pos=$2} END {print file,pos}')
+        read BINLOG_FILE START_POS <"$LAST_FULL_POS_FILE"
+        read CUR_BINLOG CUR_POS <<<$(mysql -e "SHOW MASTER STATUS\G" | awk '/File:/ {file=$2} /Position:/ {pos=$2} END {print file,pos}')
 
         BINLOG_LIST=($(mysql -e "SHOW BINARY LOGS;" | awk 'NR>1 {print $1}'))
         FILES_TO_USE=()
@@ -117,25 +117,25 @@ for DB_NAME in $ALL_DBS; do
         done
 
         INC_FILE="$DB_DIR/${DB_NAME}_inc_${TIMESTAMP}.sql"
-        mysqlbinlog --start-position="$START_POS" --stop-position="$CUR_POS" --database="$DB_NAME" "${FILES_TO_USE[@]/#/$BINLOG_DIR/}" > "$INC_FILE"
+        mysqlbinlog --start-position="$START_POS" --stop-position="$CUR_POS" --database="$DB_NAME" "${FILES_TO_USE[@]/#/$BINLOG_DIR/}" >"$INC_FILE"
         gzip "$INC_FILE"
         log_message "Incremental backup complete: $(basename "$INC_FILE.gz")" "success"
     else
         log_message "Starting full backup for '$DB_NAME'..." "info"
 
         TABLE_INFO_FULL="$DB_DIR/table_info_full.txt"
-        echo -e "database_name\ttable_name\ttable_rows" > "$TABLE_INFO_FULL"
+        echo -e "database_name\ttable_name\ttable_rows" >"$TABLE_INFO_FULL"
         TABLES=$(mysql -N -e "SELECT table_name FROM information_schema.tables WHERE table_schema='$DB_NAME' AND table_type='BASE TABLE';")
         for TABLE in $TABLES; do
             ROWS=$(mysql -N -e "SELECT COUNT(*) FROM \`$DB_NAME\`.\`$TABLE\`;")
-            echo -e "$DB_NAME\t$TABLE\t$ROWS" >> "$TABLE_INFO_FULL"
+            echo -e "$DB_NAME\t$TABLE\t$ROWS" >>"$TABLE_INFO_FULL"
         done
 
-        read BINLOG_FILE BINLOG_POS <<< $(mysql -e "SHOW MASTER STATUS\G" | awk '/File:/ {file=$2} /Position:/ {pos=$2} END {print file,pos}')
-        echo "$BINLOG_FILE $BINLOG_POS" > "$DB_DIR/full_start.txt"
+        read BINLOG_FILE BINLOG_POS <<<$(mysql -e "SHOW MASTER STATUS\G" | awk '/File:/ {file=$2} /Position:/ {pos=$2} END {print file,pos}')
+        echo "$BINLOG_FILE $BINLOG_POS" >"$DB_DIR/full_start.txt"
 
         FULL_BACKUP_FILE="$DB_DIR/${DB_NAME}_full_${TIMESTAMP}.sql"
-        mysqlpump --single-transaction --defer-table-indexes=FALSE --databases "$DB_NAME" > "$FULL_BACKUP_FILE"
+        mysqlpump --single-transaction --defer-table-indexes=FALSE --databases "$DB_NAME" >"$FULL_BACKUP_FILE"
         gzip "$FULL_BACKUP_FILE"
         log_message "Full backup complete: $(basename "$FULL_BACKUP_FILE.gz")" "success"
     fi
